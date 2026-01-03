@@ -1,0 +1,79 @@
+@import "tailwindcss";
+
+:root{
+    --color1:#061E29;
+    --color2:#1D546D;
+    --color3:#5F9598;
+    --color4:#F3F4F4;
+  --font-bold: 'Anton', sans-serif;
+  --font-light: 'Schibsted Grotesk', sans-serif;
+}
+
+@import url('https://fonts.googleapis.com/css2?family=Anton&display=swap');
+.anton-regular {
+  font-family: "Anton", sans-serif;
+  font-weight: 400;
+  font-style: normal;
+}
+
+@import url('https://fonts.googleapis.com/css2?family=Anton&family=Schibsted+Grotesk:ital,wght@0,400..900;1,400..900&display=swap');
+.anton-regular {
+  font-family: "Anton", sans-serif;
+  font-weight: 400;
+  font-style: normal;
+}
+html {
+  scroll-behavior: smooth;
+}
+
+.font-anton { font-family: 'Anton', sans-serif; }
+.font-grotesk { font-family: 'Schibsted Grotesk', sans-serif; }
+
+/* Reveal Animation */
+.reveal {
+  opacity: 0;
+  transform: translateY(30px);
+  transition: all 0.8s cubic-bezier(0.22, 1, 0.36, 1);
+}
+
+.reveal.active {
+  opacity: 1;
+  transform: translateY(0);
+}
+
+.theme-transition {
+  transition: background-color 0.6s ease, color 0.6s ease;
+}
+
+/* Glassmorphism */
+.premium-glass {
+  background: rgba(29, 84, 109, 0.1);
+  backdrop-filter: blur(12px);
+  border: 1px solid rgba(95, 149, 152, 0.1);
+}
+
+/* Glassmorphism Utility */
+.lysis-glass {
+  background: rgba(29, 84, 109, 0.2);
+  backdrop-filter: blur(20px) saturate(180%);
+  -webkit-backdrop-filter: blur(20px) saturate(180%);
+  border: 1px solid rgba(255, 255, 255, 0.1);
+}
+
+.lysis-glass-light {
+  background: rgba(255, 255, 255, 0.05);
+  backdrop-filter: blur(10px);
+  border: 1px solid rgba(255, 255, 255, 0.05);
+}
+
+/* Custom Scrollbar */
+::-webkit-scrollbar {
+  width: 4px;
+}
+::-webkit-scrollbar-track {
+  background: transparent;
+}
+::-webkit-scrollbar-thumb {
+  background: var(--color3);
+  border-radius: 10px;
+}
