@@ -2,7 +2,7 @@ import { createSlice } from "@reduxjs/toolkit";
 
 
 
-interface ChatMessage {
+export interface ChatMessage {
     id: number;
     role: 'user' | 'assistant' | 'system';
     content: string;
@@ -15,8 +15,7 @@ const chatSlice = createSlice({
     name: 'chatHistory',
     initialState,
     reducers: {
-        setChatData(state,action: { payload: ChatMessage[]; type: string }){
-            console.log("slice d: ",action.payload)
+        setChatData(state, action: { payload: ChatMessage[]; type: string }) {
             state = action.payload;
             return state;
         },
@@ -35,5 +34,5 @@ const chatSlice = createSlice({
     }
 });
 
-export const { addChat, clearChat, updateLastChat,setChatData } = chatSlice.actions;
+export const { addChat, clearChat, updateLastChat, setChatData } = chatSlice.actions;
 export default chatSlice.reducer;

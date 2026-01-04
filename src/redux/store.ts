@@ -5,10 +5,13 @@ import apiReducer from "./features/apiSlice";
 import historyReducer from "./features/historySlice";
 
 export const store = configureStore({
-    reducer:{
-        user:userReducer,
-        chatHistory:chatReducer,
-        api:apiReducer,
-        history:historyReducer
+    reducer: {
+        user: userReducer,
+        chatHistory: chatReducer,
+        api: apiReducer,
+        history: historyReducer
     }
 })
+
+export type RootState = ReturnType<typeof store.getState>;
+export type AppDispatch = typeof store.dispatch;

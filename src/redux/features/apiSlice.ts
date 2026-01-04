@@ -24,8 +24,10 @@ const apiSlice = createSlice({
 
 export const { setLoading, setError } = apiSlice.actions;
 
+import axios from "axios";
+
 // Optional: You can pass a sessionId if you want to maintain chat history per user
-export const getResponse = (prompt: string, apiUrl: string = API_URL, sessionId: string = "session-1") => async (dispatch: Dispatch) => {
+export const getResponse = (prompt: string, apiUrl: string = API_URL, sessionId: string = "session-1", signal?: AbortSignal) => async (dispatch: Dispatch) => {
     dispatch(setLoading(true));
     dispatch(setError(null));
 
@@ -37,40 +39,37 @@ export const getResponse = (prompt: string, apiUrl: string = API_URL, sessionId:
     }));
 
     try {
+        let lastLength = 0;
+
         // Backend expects: class ChatRequest(BaseModel): query: str, thread_id: str
-        const response = await fetch(`${apiUrl}/chat`, {
-            method: "POST",
+        await axios.post(`${apiUrl}/chat`, {
+            query: prompt,        // "prompt" changed to "query" to match Python backend
+            thread_id: sessionId  // Required by Python LangGraph for memory
+        }, {
             headers: {
                 "Content-Type": "application/json",
             },
-            body: JSON.stringify({
-                query: prompt,        // "prompt" changed to "query" to match Python backend
-                thread_id: sessionId  // Required by Python LangGraph for memory
-            }),
+            signal, // Pass the abort signal
+            responseType: 'text', // Important for streaming text
+            onDownloadProgress: (progressEvent) => {
+                const response = progressEvent.event.target.response;
+                const chunk = response.substring(lastLength);
+                lastLength = response.length;
+
+                if (chunk) {
+                    dispatch(updateLastChat(chunk));
+                }
+            }
         });
 
-        if (!response.body || response.status !== 200) {
-            throw new Error(`Error: ${response.statusText}`);
-        }
-
-        const reader = response.body.getReader();
-        const decoder = new TextDecoder("utf-8");
-        let done = false;
-
-        while (!done) {
-            const { value, done: doneReading } = await reader.read();
-            done = doneReading;
-
-            if (value) {
-                // Decode the stream chunk (Python returns text/plain chunks)
-                const chunk = decoder.decode(value, { stream: true });
-                dispatch(updateLastChat(chunk));
-            }
-        }
     } catch (err: any) {
-        console.error("API Error:", err);
-        dispatch(setError(err.message || "Failed to fetch response"));
-        dispatch(updateLastChat("\n\n❌ **Connection Error:** Backend is not running or failed to respond."));
+        if (axios.isCancel(err)) {
+            console.log("Request canceled by user");
+        } else {
+            console.error("API Error:", err);
+            dispatch(setError(err.message || "Failed to fetch response"));
+            dispatch(updateLastChat("\n\n❌ **Connection Error:** Backend is not running or failed to respond."));
+        }
     } finally {
         dispatch(setLoading(false));
     }

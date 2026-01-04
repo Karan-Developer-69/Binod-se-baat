@@ -7,27 +7,29 @@ import ProtectedRoute from "./components/ProtectedRoute";
 import { useEffect } from "react";
 import { useDispatch, useSelector } from "react-redux";
 import { setUser } from "./redux/features/userSlice";
+import type { RootState } from './redux/store';
 
 const App = () => {
+  const dispatch = useDispatch();
+  const { isLoading, theme } = useSelector((state: RootState) => state.user);
 
-  const dispatcher = useDispatch();
-  const isLoading = useSelector((state) => state?.user?.isLoading);
+  useEffect(() => {
+    document.documentElement.setAttribute('data-theme', theme || 'dark');
+  }, [theme]);
 
-  useEffect(()=>{
-    function fetchUserFromStorage() {
-      const storedUser = localStorage.getItem('app_preferences');
+  useEffect(() => {
+    const storedUser = localStorage.getItem('app_preferences');
+    if (storedUser) {
       const parsedUser = JSON.parse(storedUser);
-      if (storedUser && parsedUser.isLoggedIn) {
-        // Explicitly set isLoggedIn to true when restoring from storage
-        dispatcher(setUser({...parsedUser}));
-        console.log("App - user state:", parsedUser);
+      if (parsedUser && parsedUser.isLoggedIn) {
+        dispatch(setUser({ ...parsedUser }));
       } else {
-        // No user in storage, mark loading as complete
-        dispatcher(setUser({isLoggedIn:false}));
+        dispatch(setUser({ isLoggedIn: false }));
       }
+    } else {
+      dispatch(setUser({ isLoggedIn: false }));
     }
-    fetchUserFromStorage();
-  },[dispatcher])
+  }, [dispatch]);
 
   // Show loading while fetching from localStorage
   if (isLoading) {

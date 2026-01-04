@@ -2,20 +2,18 @@ import React, { useState, useEffect, useRef } from 'react';
 import {
   Send, Sparkles, Menu, Plus,
   Brain, Globe, Settings,
-  Loader2, X, MessageSquare
+  Loader2, X, MessageSquare, Trash2, Square
 } from 'lucide-react';
 import { Link } from 'react-router-dom';
 import { useDispatch, useSelector } from 'react-redux';
 import ReactMarkdown from 'react-markdown';
 import remarkGfm from 'remark-gfm';
 
-// Internal Imports
 import { getResponse } from '../redux/features/apiSlice';
-import { addChat, clearChat, setChatData } from '../redux/features/chatSlice';
+import { addChat, type ChatMessage, clearChat } from '../redux/features/chatSlice';
 import CodeBlock from '../components/CodeBlock';
-import { addToHistory, loadOldData } from '../redux/features/historySlice';
-
-// --- Sub-Components ---
+import { loadOldData, addToHistory, deleteFromHistory, type HistoryItem } from '../redux/features/historySlice';
+import type { RootState } from '../redux/store';
 
 const ModeToggle = ({ active, onClick, icon: Icon, label }: any) => (
   <button
@@ -34,17 +32,22 @@ const ModeToggle = ({ active, onClick, icon: Icon, label }: any) => (
 const Chat: React.FC = () => {
   const dispatch = useDispatch();
 
-  const [name, profileImage] = useSelector((state: any) => [state.user.name || 'New User', state.user.image]);
-  // Redux
-  const chatHistory = useSelector((state: any) => state?.chatHistory || []);
-  const loading = useSelector((state: any) => state?.api?.loading);
-  const theme = useSelector((state: any) => state?.user?.theme || 'dark');
+  const name = useSelector((state: RootState) => state.user.name || 'New User');
+  const profileImage = useSelector((state: RootState) => state.user.image);
 
-  const history = useSelector((state: any) => state?.history || []);
-  // Local State
+  const chatHistory = useSelector((state: RootState) => state.chatHistory || []);
+  const loading = useSelector((state: RootState) => state.api.loading);
+
+
+  // typed as HistoryItem[]
+  const history = useSelector((state: RootState) => state.history as HistoryItem[] || []);
+
   const [input, setInput] = useState('');
   const [modes, setModes] = useState({ web: false, deep: false });
   const [isSidebarOpen, setIsSidebarOpen] = useState(false);
+
+  // Use a unique ID for the current session. 
+  // If null, we are in a "New Chat" state but haven't saved it yet.
   const [chatId, setChatId] = useState<string | null>(null);
 
   const [selectedModel, setSelectedModel] = useState<'qwen' | 'gptoss'>('qwen');
@@ -56,113 +59,141 @@ const Chat: React.FC = () => {
 
   const scrollRef = useRef<HTMLDivElement>(null);
   const textareaRef = useRef<HTMLTextAreaElement>(null);
+  const abortControllerRef = useRef<AbortController | null>(null);
 
-  useEffect(() => {
-    document.documentElement.setAttribute('data-theme', theme);
-  }, [theme]);
-
-
-  // Auto-scroll
+  // Auto-scroll to bottom
   useEffect(() => {
     if (scrollRef.current) {
       scrollRef.current.scrollTo({ top: scrollRef.current.scrollHeight, behavior: 'smooth' });
     }
   }, [chatHistory, loading]);
 
-  // Current conversation title: use title from the latest assistant message if available
-  const currentAssistant = [...chatHistory].reverse().find((m: any) => m.role === 'assistant' && (m.title || m.content));
-  const currentTitle = currentAssistant ? (currentAssistant.title || (currentAssistant.content || '').split('\n').find(Boolean) || 'New Conversation') : null;
+  // Determine current title from chat content if not explicit
+  const currentAssistant = [...chatHistory].reverse().find((m: ChatMessage) => m.role === 'assistant' && (m.title || m.content));
+  const derivedTitle = currentAssistant ? (currentAssistant.title || (currentAssistant.content || '').split('\n').find(Boolean) || 'New Conversation') : 'New Conversation';
 
 
-  // Auto-resize Textarea
-  useEffect(() => {
-    if (textareaRef.current) {
-      textareaRef.current.style.height = 'auto';
-      textareaRef.current.style.height = Math.min(textareaRef.current.scrollHeight, 200) + 'px';
-    }
-  }, [input]);
-
+  // Load global history list on mount
   useEffect(() => {
     try {
-      const storedHistoryText = localStorage.getItem("history");
+      const storedHistoryText = localStorage.getItem("app_history_index");
       const storedHistory = storedHistoryText ? JSON.parse(storedHistoryText) : [];
-      if (Array.isArray(storedHistory) && storedHistory.length > 0) {
-        // Redux might need a specific structure or just strings. 
-        // Based on historySlice, it expects string[].
+      if (Array.isArray(storedHistory)) {
         dispatch(loadOldData(storedHistory));
       }
     } catch (e) {
-      console.error("Failed to load history", e);
+      console.error("Failed to load history index", e);
     }
   }, [dispatch]);
 
+  // Load chat content when chatId changes
   useEffect(() => {
     if (chatId) {
-      try {
-        const storedChatText = localStorage.getItem(chatId);
-        if (storedChatText) {
-          const parsedChat = JSON.parse(storedChatText);
-          if (Array.isArray(parsedChat)) {
+      const storedChat = localStorage.getItem(`chat_${chatId}`);
+      if (storedChat) {
+        try {
+          const parsed = JSON.parse(storedChat);
+          if (Array.isArray(parsed)) {
+            // Avoid dispatching if content is same to prevent loops, but simple clear+add is safe enough here
+            // We only want to load IF the redux state is empty or different. 
+            // For simplicity, we trust the user click action or ID change to trigger this load.
+            // To prevent overwrite loop: We are NOT saving in this effect.
             dispatch(clearChat());
-            parsedChat.forEach((msg) => {
-              dispatch(addChat(msg));
-            });
+            parsed.forEach(msg => dispatch(addChat(msg)));
           }
-        }
-      } catch (e) {
-        console.error("Failed to load chat", e);
+        } catch (e) { console.error("Failed to parse chat", e); }
       }
+    } else {
+      // No ID means new chat
+      dispatch(clearChat());
     }
   }, [chatId, dispatch]);
 
+
+  // SAVE LOGIC: Update current chat content in localStorage and update history index
   useEffect(() => {
-    // Only generate title if we have some content and don't have a chatId yet (or it's a new chat flow)
-    // Here we check if we have a second message (usually assistant response) to generate a meaningful title
-    if (!chatId && chatHistory.length >= 2) {
-      const potentialTitle = chatHistory[1]?.content?.substring(0, 30)?.split('\n')[0]?.replace(/[#*`]/g, '').trim();
-
-      if (potentialTitle) {
-        // Verify uniqueness
-        let title = potentialTitle;
-        let counter = 1;
-        // Check against current redux history to distinguish
-        while (history.includes(title)) {
-          title = `${potentialTitle} (${counter})`;
-          counter++;
-        }
-
-        // 1. Dispatch to Redux immediately so UI updates
-        dispatch(addToHistory(title));
-
-        // 2. Set local state
-        setChatId(title);
-
-        // 3. Persist to localStorage
-        const currentHistory = JSON.parse(localStorage.getItem("history") || "[]");
-        // Double check we don't save duplicates if useEffect fires twice
-        if (!currentHistory.includes(title)) {
-          const newHistory = [...currentHistory, title];
-          localStorage.setItem("history", JSON.stringify(newHistory));
-        }
+    if (chatHistory.length > 0) {
+      // If we have content but no ID, generate one now.
+      let currentId = chatId;
+      if (!currentId) {
+        currentId = Date.now().toString();
+        setChatId(currentId);
       }
-    }
-  }, [chatHistory, chatId, history, dispatch]);
 
-  // Save current chat content to localStorage whenever it updates
-  useEffect(() => {
-    if (chatId && chatHistory.length > 0) {
-      localStorage.setItem(chatId, JSON.stringify(chatHistory));
+      // 1. Save Content
+      localStorage.setItem(`chat_${currentId}`, JSON.stringify(chatHistory));
+
+      // 2. Update History Index if title changed or it's new
+      // We derive title from the chat content dynamically
+      const historyItem: HistoryItem = {
+        id: currentId,
+        title: derivedTitle.substring(0, 40) + (derivedTitle.length > 40 ? '...' : ''),
+        date: new Date().toISOString()
+      };
+
+      // Dispatch to Redux (will handle duplicate check/update)
+      dispatch(addToHistory(historyItem));
     }
-  }, [chatHistory, chatId]);
+  }, [chatHistory, chatId, dispatch, derivedTitle]);
+
+  // Sync History Index Redux -> LocalStorage
+  // We do this in a separate effect to ensure the "index" persistence matches Redux state
+  useEffect(() => {
+    if (history.length > 0) {
+      localStorage.setItem("app_history_index", JSON.stringify(history));
+    }
+  }, [history]);
+
+
+  const startNewChat = () => {
+    setChatId(null);
+    dispatch(clearChat());
+    setIsSidebarOpen(false);
+  };
+
+  const loadChat = (id: string) => {
+    setChatId(id);
+    setIsSidebarOpen(false);
+    // The useEffect [chatId] will handle loading the content
+  };
+
+  const handleDeleteChat = (e: React.MouseEvent, id: string) => {
+    e.stopPropagation();
+    localStorage.removeItem(`chat_${id}`);
+    dispatch(deleteFromHistory(id));
+    if (chatId === id) {
+      startNewChat();
+    }
+  };
+
+
+  const stopGeneration = () => {
+    if (abortControllerRef.current) {
+      abortControllerRef.current.abort();
+      abortControllerRef.current = null;
+    }
+  };
 
   const handleSend = () => {
+    if (loading) {
+      stopGeneration();
+      return;
+    }
+
     if (!input.trim()) return;
+
+    // Abort previous if any (safeguard)
+    stopGeneration();
+
+    const controller = new AbortController();
+    abortControllerRef.current = controller;
+
     let finalPrompt = input;
     if (modes.web) finalPrompt += " (Use Web Search)";
     if (modes.deep) finalPrompt += " (Think Deeply)";
 
     dispatch(addChat({ id: Date.now(), role: 'user', content: input }));
-    dispatch(getResponse(finalPrompt, MODEL_URLS[selectedModel]));
+    dispatch(getResponse(finalPrompt, MODEL_URLS[selectedModel], "session-1", controller.signal) as unknown as any);
 
     setInput('');
     if (textareaRef.current) textareaRef.current.style.height = 'auto';
@@ -175,25 +206,23 @@ const Chat: React.FC = () => {
     }
   };
 
-  const handleChangeChat = (id: string) => {
-    const data = localStorage.getItem(id)
-    console.log("data", data)
-    if (data) {
-      dispatch(clearChat())
-      dispatch(setChatData(JSON.parse(data)))
+  // TextArea auto-resize
+  useEffect(() => {
+    if (textareaRef.current) {
+      textareaRef.current.style.height = 'auto';
+      textareaRef.current.style.height = Math.min(textareaRef.current.scrollHeight, 200) + 'px';
     }
-  }
+  }, [input]);
+
 
   return (
     <div className="flex h-screen w-full bg-[var(--color1)] text-[var(--color4)] font-body overflow-hidden">
 
-      {/* --- SIDEBAR --- */}
       <aside className={`
         fixed md:relative z-50 h-full w-[280px] bg-[var(--glass-bg)] backdrop-blur-xl border-r border-[var(--border)] 
         flex flex-col transition-transform duration-300 shrink-0
         ${isSidebarOpen ? 'translate-x-0' : '-translate-x-full md:translate-x-0'}
       `}>
-        {/* Sidebar Header */}
         <div className="p-4">
           <div className="flex items-center gap-3 mb-6 px-2">
             <div className="w-8 h-8 rounded-lg bg-[var(--color3)] flex items-center justify-center text-white shadow-lg shadow-[var(--color3)]/20">
@@ -201,7 +230,20 @@ const Chat: React.FC = () => {
             </div>
             <div>
               <h1 className="text-base font-bold tracking-wide text-[var(--color4)]">Lysis AI</h1>
-              <p className="text-[10px] text-[var(--muted)] font-mono">MODEL: QWEN 2.5</p>
+              <div className="flex gap-2 mt-1">
+                <button
+                  onClick={() => setSelectedModel('qwen')}
+                  className={`text-[10px] px-2 py-0.5 rounded border transition-colors ${selectedModel === 'qwen' ? 'bg-[var(--color3)] text-white border-[var(--color3)]' : 'text-[var(--muted)] border-[var(--border)] hover:border-[var(--color3)]'}`}
+                >
+                  Qwen
+                </button>
+                <button
+                  onClick={() => setSelectedModel('gptoss')}
+                  className={`text-[10px] px-2 py-0.5 rounded border transition-colors ${selectedModel === 'gptoss' ? 'bg-[var(--color3)] text-white border-[var(--color3)]' : 'text-[var(--muted)] border-[var(--border)] hover:border-[var(--color3)]'}`}
+                >
+                  GPTOSS
+                </button>
+              </div>
             </div>
             <button onClick={() => setIsSidebarOpen(false)} className="md:hidden ml-auto text-[var(--muted)]">
               <X size={20} />
@@ -209,7 +251,7 @@ const Chat: React.FC = () => {
           </div>
 
           <button
-            onClick={() => { dispatch(clearChat()); setIsSidebarOpen(false); }}
+            onClick={startNewChat}
             className="w-full flex items-center gap-3 px-3 py-3 rounded-xl bg-[var(--surface-hover)] border border-[var(--border)] 
                      hover:border-[var(--color3)]/30 hover:shadow-md transition-all text-sm text-[var(--color4)] font-medium group"
           >
@@ -218,21 +260,30 @@ const Chat: React.FC = () => {
           </button>
         </div>
 
-        {/* Sidebar History List (Scrollable) */}
         <div className="flex-1 overflow-y-auto px-4 py-2 space-y-1 custom-scrollbar">
           <p className="text-xs font-semibold text-[var(--muted)] mb-3 px-2 uppercase tracking-wider">Recent</p>
-          {/* Placeholder History Items */}
-          {history.map((title: string, i: number) => (
-            <button key={i} onClick={() => handleChangeChat(title)} className="w-full flex items-center gap-3 p-2 rounded-lg hover:bg-[var(--surface-hover)] text-left transition group">
-              <MessageSquare size={14} className="text-[var(--muted)] group-hover:text-[var(--color3)]" />
-              <span className="text-sm text-[var(--muted)] group-hover:text-[var(--color4)] truncate">{title}</span>
-            </button>
+          {history.length === 0 && <div className="text-[var(--muted)] text-xs px-2 italic">No history yet</div>}
+          {history.map((item) => (
+            <div key={item.id} className="group relative">
+              <button
+                onClick={() => loadChat(item.id)}
+                className={`w-full flex items-center gap-3 p-2 rounded-lg text-left transition ${chatId === item.id ? 'bg-[var(--surface-hover)] border border-[var(--border)]' : 'hover:bg-[var(--surface-hover)]'}`}
+              >
+                <MessageSquare size={14} className={`${chatId === item.id ? 'text-[var(--color3)]' : 'text-[var(--muted)]'}`} />
+                <span className={`text-sm truncate pr-6 ${chatId === item.id ? 'text-[var(--color4)] font-medium' : 'text-[var(--muted)]'}`}>{item.title || "Untitled Chat"}</span>
+              </button>
+              <button
+                onClick={(e) => handleDeleteChat(e, item.id)}
+                className="absolute right-2 top-1/2 -translate-y-1/2 p-1.5 text-[var(--muted)] hover:text-red-400 opacity-0 group-hover:opacity-100 transition-opacity"
+                title="Delete Chat"
+              >
+                <Trash2 size={13} />
+              </button>
+            </div>
           ))}
         </div>
 
-        {/* Capabilities Footer */}
         <div className="p-4 border-t border-[var(--border)] bg-[var(--color1)]/30">
-          {/* Profile Pill (Aligned Center-Top of Input) */}
           <div className="flex justify-center">
             <Link to="/profile" className="flex w-full h-full justify-between items-center gap-2 px-3 py-1.5 rounded-full bg-[var(--glass-bg)] border border-[var(--glass-border)] hover:border-[var(--color3)]/40 hover:bg-[var(--surface-hover)] transition group shadow-sm backdrop-blur-md">
               {
@@ -250,10 +301,8 @@ const Chat: React.FC = () => {
         </div>
       </aside>
 
-      {/* --- MAIN CHAT AREA --- */}
       <main className="flex-1 flex flex-col h-full relative min-w-0 bg-[var(--color1)]">
 
-        {/* Mobile Header */}
         <header className="md:hidden flex items-center justify-between p-4 border-b border-[var(--border)] bg-[var(--glass-bg)] backdrop-blur-md z-10">
           <div className="flex items-center gap-2 font-bold text-[var(--color4)]">
             <Brain className="text-[var(--color3)]" size={20} /> Lysis
@@ -263,15 +312,13 @@ const Chat: React.FC = () => {
           </button>
         </header>
 
-        {/* Chat Scroll Container */}
         <div ref={scrollRef} className="flex-1 overflow-y-auto p-4 md:p-8 md:pb-[15rem] space-y-8 scroll-smooth pb-48">
-          {currentTitle && (
+          {chatId && derivedTitle && (
             <div className="max-w-3xl mx-auto w-full mb-4">
-              <h2 className="text-lg font-semibold text-[var(--color4)] truncate">{currentTitle}</h2>
+              <h2 className="text-lg font-semibold text-[var(--color4)] truncate opacity-50 text-center">{derivedTitle}</h2>
             </div>
           )}
           {chatHistory.length === 0 ? (
-            /* Empty State / Welcome Screen */
             <div className="h-full flex flex-col items-center justify-center text-center px-4 animate-fade-in pb-20">
               <div className="w-20 h-20 rounded-3xl bg-gradient-to-br from-[var(--color3)]/10 to-transparent flex items-center justify-center mb-6 border border-[var(--color3)]/20 shadow-2xl shadow-[var(--color3)]/10">
                 <Sparkles size={40} className="text-[var(--color3)]" />
@@ -293,9 +340,8 @@ const Chat: React.FC = () => {
               </div>
             </div>
           ) : (
-            /* Chat Messages */
             <div className="max-w-3xl mx-auto w-full space-y-8">
-              {chatHistory.map((msg: object, idx: number) => (
+              {chatHistory.map((msg: ChatMessage, idx: number) => (
                 <div key={idx} className={`flex w-full ${msg.role === 'user' ? 'justify-end' : 'justify-start'} animate-fade-in group`}>
 
                   {msg.role === 'user' ? (
@@ -308,13 +354,11 @@ const Chat: React.FC = () => {
                         <Brain size={18} />
                       </div>
 
-                      {/* --- MARKDOWN CONTENT --- */}
                       <div className="flex-1 min-w-0 prose prose-invert max-w-none text-[var(--color4)]">
                         <ReactMarkdown
                           remarkPlugins={[remarkGfm]}
                           components={{
-                            // Override Code Blocks
-                            code({ node, inline, className, children, ...props }: any) {
+                            code({ inline, className, children, ...props }: any) {
                               const match = /language-(\w+)/.exec(className || '');
                               return !inline && match ? (
                                 <CodeBlock
@@ -327,11 +371,9 @@ const Chat: React.FC = () => {
                                 </code>
                               );
                             },
-                            // Style Links
-                            a: ({ node, ...props }) => <a className="text-[var(--color3)] underline underline-offset-4 hover:text-white" {...props} />,
-                            // Style Lists
-                            ul: ({ node, ...props }) => <ul className="list-disc pl-4 space-y-1 my-2 text-[var(--muted)]" {...props} />,
-                            ol: ({ node, ...props }) => <ol className="list-decimal pl-4 space-y-1 my-2 text-[var(--muted)]" {...props} />
+                            a: ({ ...props }) => <a className="text-[var(--color3)] underline underline-offset-4 hover:text-white" {...props} />,
+                            ul: ({ ...props }) => <ul className="list-disc pl-4 space-y-1 my-2 text-[var(--muted)]" {...props} />,
+                            ol: ({ ...props }) => <ol className="list-decimal pl-4 space-y-1 my-2 text-[var(--muted)]" {...props} />
                           }}
                         >
                           {msg.content}
@@ -358,13 +400,9 @@ const Chat: React.FC = () => {
 
         </div>
 
-        {/* --- BOTTOM SECTION (Fixed) --- */}
         <div className="absolute bottom-0 left-0 right-0 bg-gradient-to-t from-[var(--color1)] via-[var(--color1)] to-transparent pt-20 pb-6 px-4 z-20">
           <div className="max-w-3xl mx-auto space-y-4">
 
-
-
-            {/* Input Wrapper */}
             <div className="relative group">
               <div className="absolute -inset-0.5 bg-gradient-to-r from-[var(--color3)] to-violet-600 rounded-2xl opacity-20 group-focus-within:opacity-50 blur transition duration-500"></div>
               <div className="relative bg-[var(--color1)] rounded-2xl border border-[var(--border)] focus-within:border-[var(--color3)]/50 transition-all shadow-xl overflow-hidden">
@@ -379,15 +417,15 @@ const Chat: React.FC = () => {
                 />
                 <button
                   onClick={handleSend}
-                  disabled={!input.trim() || loading}
-                  className="absolute right-2 bottom-2 p-2.5 rounded-xl bg-[var(--color3)] text-white hover:brightness-110 disabled:opacity-50 disabled:grayscale transition shadow-lg shadow-[var(--color3)]/20"
+                  disabled={(!input.trim() && !loading)}
+                  className={`absolute right-2 bottom-2 p-2.5 rounded-xl text-white transition shadow-lg shadow-[var(--color3)]/20 
+                    ${loading ? 'bg-red-500 hover:bg-red-600' : 'bg-[var(--color3)] hover:brightness-110 disabled:opacity-50 disabled:grayscale'}`}
                 >
-                  {loading ? <Loader2 size={18} className="animate-spin" /> : <Send size={18} />}
+                  {loading ? <Square size={18} fill="currentColor" /> : <Send size={18} />}
                 </button>
               </div>
             </div>
 
-            {/* Toggles */}
             <div className="flex justify-between items-center px-2">
               <div className="flex gap-2 items-center">
                 <select
@@ -420,7 +458,6 @@ const Chat: React.FC = () => {
           </div>
         </div>
 
-        {/* Mobile Overlay */}
         {isSidebarOpen && (
           <div className="fixed inset-0 bg-black/60 backdrop-blur-sm z-40 md:hidden animate-fade-in" onClick={() => setIsSidebarOpen(false)} />
         )}

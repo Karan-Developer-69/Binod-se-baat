@@ -3,43 +3,55 @@ import {
   User, Mail, ArrowLeft,
   LogOut, Camera, Save, CheckCircle2
 } from 'lucide-react';
-import { useDispatch, useSelector } from 'react-redux';
+import { useDispatch, useSelector } from "react-redux";
+import type { RootState } from "../redux/store";
 import { logout, setUser } from '../redux/features/userSlice';
 import { useNavigate } from 'react-router-dom';
+
+
+interface UserProfile {
+  name?: string;
+  email?: string;
+  image?: string;
+  theme?: string;
+  isLoggedIn?: boolean;
+  password?: string;
+}
 
 const Profile: React.FC = () => {
 
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   const dispatch = useDispatch();
-  const user = useSelector((state)=>state?.user);
+  const user = useSelector((state: RootState) => state.user); // Added explicit RootState type for better inference if not already there
 
   const navigate = useNavigate();
 
   // Lazy Initialize State from LocalStorage
-  const [profile, setLocalProfile] = useState({});
+  const [profile, setLocalProfile] = useState<UserProfile>({});
 
-  const theme = useSelector(state => state?.user?.theme || 'light');
-  
+  const theme = useSelector((state: RootState) => state.user.theme || 'light');
+
 
   const handleLogout = () => {
-    localStorage.setItem('app_preferences',JSON.stringify({...user, isLoggedIn:false}));
+    localStorage.setItem('app_preferences', JSON.stringify({ ...user, isLoggedIn: false }));
     dispatch(logout())
     navigate('/')
   };
 
 
 
-  const [isDark, setIsDark] = useState(() => theme === 'dark');
+  const isDark = theme === 'dark';
+
+  const toggleTheme = () => {
+    dispatch(setUser({ theme: isDark ? 'light' : 'dark' }));
+  };
+
   const [isSaved, setIsSaved] = useState(false);
 
   useEffect(() => {
-    document.documentElement.setAttribute('data-theme', isDark ? 'dark' : 'light');
-  }, [isDark]);
-
-  useEffect(()=>{
     setLocalProfile(user)
-  },[user])
+  }, [user])
 
   const handleImageUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
@@ -53,7 +65,7 @@ const Profile: React.FC = () => {
   };
 
   const saveSettings = () => {
-    const updatedProfile = { ...profile, theme: isDark ? 'dark' : 'light' };
+    const updatedProfile = { ...profile, theme: theme };
     dispatch(setUser(updatedProfile));
     localStorage.setItem('app_preferences', JSON.stringify(updatedProfile));
     setIsSaved(true);
@@ -105,7 +117,7 @@ const Profile: React.FC = () => {
             <div className="w-full flex items-center justify-between">
               <span className="text-sm font-medium">Dark Mode</span>
               <button
-                onClick={() => setIsDark(!isDark)}
+                onClick={toggleTheme}
                 className={`w-12 h-7 rounded-full p-1 flex items-center transition-colors duration-300 ${isDark ? 'bg-[var(--color3)]' : 'bg-[var(--border)]'}`}
               >
                 <div className={`w-5 h-5 rounded-full bg-white shadow-sm transform transition-transform duration-300 ${isDark ? 'translate-x-5' : 'translate-x-0'}`} />
@@ -128,7 +140,7 @@ const Profile: React.FC = () => {
                     <input
                       type="text"
                       value={profile.name}
-                        onChange={(e) => setLocalProfile({ ...profile, name: e.target.value })}
+                      onChange={(e) => setLocalProfile({ ...profile, name: e.target.value })}
                       className="w-full premium-input rounded-xl py-3 pl-12 pr-4 text-sm"
                     />
                   </div>

@@ -1,208 +1,210 @@
-import React, { use, useEffect, useState } from 'react';
-import { useNavigate } from 'react-router-dom';
-import {
-  Mail, Lock, User, ArrowRight,
-  Github, Chrome, ShieldCheck, Eye, EyeOff, LayoutDashboard
-} from 'lucide-react';
+import React, { useEffect, useState } from 'react';
+import { Eye, EyeOff, Loader2, Lock, Mail, User, LayoutDashboard, ShieldCheck, ArrowRight, Github, Chrome } from 'lucide-react';
 import { useDispatch, useSelector } from 'react-redux';
+import { useNavigate } from 'react-router-dom';
+
 import { auth } from '../redux/features/userSlice';
+import type { RootState, AppDispatch } from '../redux/store';
 
-const Auth: React.FC = () => {
-
-  const dispath = useDispatch();
-  const user = useSelector(state=>state?.user)
-  const navigate = useNavigate();
-  
-  useEffect(()=>{
-    if (user.isLoggedIn){
-      navigate('/chat');
-    }
-  },[user])
-
+const Auth = () => {
   const [isLogin, setIsLogin] = useState(true);
   const [showPassword, setShowPassword] = useState(false);
-  const [formData, setFormData] = useState({ name: '', email: '', password: '' });
+  const dispatch = useDispatch<AppDispatch>();
+  const navigate = useNavigate();
 
+  const user = useSelector((state: RootState) => state.user);
+
+  const [formData, setFormData] = useState({
+    name: '',
+    email: '',
+    password: ''
+  });
+
+  useEffect(() => {
+    if (user.isLoggedIn) {
+      navigate('/chat');
+    }
+  }, [user.isLoggedIn, navigate]);
+
+  const handleSubmit = (e: React.FormEvent) => {
+    e.preventDefault();
+    // Use auth action with register flag
+    dispatch(auth({ ...formData, register: !isLogin }));
+  };
+
+  useEffect(() => {
+    const rawData = localStorage.getItem('app_preferences');
+    if (rawData) {
+      const storedUser = JSON.parse(rawData);
+      if (storedUser.isLoggedIn) {
+        navigate('/chat');
+      }
+    }
+  }, [navigate]);
 
   const handleChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     setFormData({ ...formData, [e.target.name]: e.target.value });
   };
 
-  
-
-  const handleAction = (e: React.FormEvent) => {
-    e.preventDefault();
-
-    let profile = user;
-
-    if (!isLogin) {
-      // Signup Mode: Overwrite with new data
-      profile = {
-        ...profile,
-        name: formData.name || 'New User',
-        email: formData.email,
-        bio: 'Just joined!', 
-      };
-      console.log('prrofile',profile)
-      dispath(auth({ ...formData, register: true }));
-    } else {
-      const user = localStorage.getItem('app_preferences') ? JSON.parse(localStorage.getItem('app_preferences')) : {};
-      console.log('prrofile',{ ...formData})
-      dispath(auth({ ...formData, register: false, user }));
-    }
-
-    // Simulate API delay
-    const btn = e.currentTarget.querySelector('button[type="submit"]');
-    if (btn) btn.innerHTML = 'Authenticating...';
-
-    if(user.isLoading){
-      setTimeout(() => {
-        navigate('/chat');
-      }, 2000);
-    }
-  };
-
   return (
-    <div className="min-h-screen w-full flex items-center justify-center p-4 relative overflow-hidden bg-[var(--color1)] text-[var(--color4)]">
+    <div className="min-h-screen bg-[var(--color1)] text-[var(--color4)] font-body flex items-center justify-center relative overflow-hidden">
 
-      {/* Background Decor */}
-      <div className="absolute top-[-10%] right-[-5%] w-[600px] h-[600px] bg-[var(--color3)]/10 blur-[120px] rounded-full"></div>
+      {/* Dynamic Background Elements */}
+      <div className="absolute top-0 left-0 w-full h-full pointer-events-none">
+        <div className="absolute top-[-10%] left-[-10%] w-[600px] h-[600px] bg-[var(--color3)]/10 rounded-full blur-[120px] animate-pulse-slow"></div>
+        <div className="absolute bottom-[-10%] right-[-10%] w-[600px] h-[600px] bg-violet-600/10 rounded-full blur-[120px] animate-pulse-slow delay-1000"></div>
+        <div className="absolute top-[20%] right-[20%] w-[300px] h-[300px] bg-[var(--color3)]/5 rounded-full blur-[80px]"></div>
+      </div>
 
-      <div className="w-full max-w-[1000px] grid lg:grid-cols-2 glass-card rounded-3xl overflow-hidden shadow-2xl z-10">
+      <div className="w-full max-w-[1000px] min-h-[600px] bg-[var(--glass-bg)] backdrop-blur-2xl rounded-3xl border border-[var(--border)] shadow-2xl flex overflow-hidden relative z-10 animate-fade-in-up mx-4">
 
-        {/* Left Side: Brand (Visible on Desktop) */}
-        <div className="hidden lg:flex flex-col justify-between p-12 bg-[var(--color3)]/5 relative overflow-hidden">
-          <div className="flex items-center gap-3 z-10">
-            <div className="bg-[var(--color3)] p-2 rounded-lg text-white">
-              <LayoutDashboard size={24} />
-            </div>
-            <span className="text-xl font-bold font-heading tracking-tight">NexUI</span>
-          </div>
-
-          <div className="relative z-10">
-            <h2 className="text-4xl font-bold font-heading mb-6 leading-tight">
-              Build faster with <br />
-              <span className="text-[var(--color3)]">Intelligence.</span>
-            </h2>
-            <p className="text-[var(--muted)] text-base max-w-sm">
-              The professional platform for developers. streamlining your workflow with advanced AI integration.
-            </p>
-          </div>
-
-          <div className="flex items-center gap-4 text-xs font-medium text-[var(--muted)]">
-            <div className="flex items-center gap-2"><ShieldCheck size={14} className="text-[var(--color3)]" /> Enterprise Grade</div>
-            <div>SOC2 Compliant</div>
-          </div>
-        </div>
-
-        {/* Right Side: Form */}
-        <div className="p-8 md:p-12 flex flex-col justify-center bg-[var(--glass-bg)]">
+        {/* Left Section - Form */}
+        <div className="w-full md:w-1/2 p-8 md:p-12 flex flex-col justify-center relative bg-[var(--color1)]/50">
 
           <div className="mb-8">
-            <h1 className="text-2xl font-bold font-heading mb-2">
-              {isLogin ? 'Welcome back' : 'Create an account'}
-            </h1>
-            <p className="text-sm text-[var(--muted)]">
-              {isLogin ? 'Enter your credentials to access your workspace.' : 'Get started with your free developer account today.'}
+            <div className="flex items-center gap-2 mb-6">
+              <div className="w-10 h-10 rounded-xl bg-[var(--color3)] flex items-center justify-center text-white shadow-lg shadow-[var(--color3)]/30">
+                <LayoutDashboard size={20} />
+              </div>
+              <span className="text-xl font-bold tracking-tight">Lysis AI</span>
+            </div>
+
+            <h2 className="text-3xl font-bold mb-2 bg-clip-text text-transparent bg-linear-to-r from-[var(--color4)] to-[var(--muted)]">
+              {isLogin ? 'Welcome Back' : 'Create Account'}
+            </h2>
+            <p className="text-[var(--muted)] text-sm">
+              {isLogin ? 'Enter your credentials to access your workspace.' : 'Get started with your intelligent assistant today.'}
             </p>
           </div>
 
-          <form onSubmit={handleAction} className="space-y-5">
+          <form onSubmit={handleSubmit} className="space-y-5">
             {!isLogin && (
-              <div className="space-y-1.5">
-                <label className="text-xs font-semibold text-[var(--color4)] ml-1">Full Name</label>
-                <div className="relative">
-                  <User className="absolute left-4 top-3.5 text-[var(--muted)]" size={18} />
-                  <input
-                    name='name'
-                    onChange={e => handleChange(e)}
-                    type="text"
-                    placeholder="Jane Doe"
-                    className="w-full premium-input rounded-xl py-3 pl-11 pr-4 text-sm"
-                  />
-                </div>
+              <div className="relative group">
+                <User className="absolute left-4 top-1/2 -translate-y-1/2 text-[var(--muted)] w-5 h-5 group-focus-within:text-(--color3) transition-colors" />
+                <input
+                  type="text"
+                  name="name"
+                  placeholder="Full Name"
+                  className="w-full bg-[var(--color2)] border border-[var(--border)] rounded-xl py-3.5 pl-12 pr-4 text-sm focus:outline-none focus:border-(--color3) focus:ring-1 focus:ring-(--color3) transition-all placeholder-[var(--muted)] text-[var(--color4)]"
+                  value={formData.name}
+                  onChange={handleChange}
+                  required
+                />
               </div>
             )}
 
-            <div className="space-y-1.5">
-              <label className="text-xs font-semibold text-[var(--color4)] ml-1">Email</label>
-              <div className="relative">
-                <Mail className="absolute left-4 top-3.5 text-[var(--muted)]" size={18} />
-                <input
-                  onChange={e => handleChange(e)}
-                  type="email"
-                  name='email'
-                  placeholder="name@company.com"
-                  className="w-full premium-input rounded-xl py-3 pl-11 pr-4 text-sm"
-                />
-              </div>
+            <div className="relative group">
+              <Mail className="absolute left-4 top-1/2 -translate-y-1/2 text-[var(--muted)] w-5 h-5 group-focus-within:text-(--color3) transition-colors" />
+              <input
+                type="email"
+                name="email"
+                placeholder="Email Address"
+                className="w-full bg-[var(--color2)] border border-[var(--border)] rounded-xl py-3.5 pl-12 pr-4 text-sm focus:outline-none focus:border-(--color3) focus:ring-1 focus:ring-(--color3) transition-all placeholder-[var(--muted)] text-[var(--color4)]"
+                value={formData.email}
+                onChange={handleChange}
+                required
+              />
             </div>
 
-            <div className="space-y-1.5">
-              <label className="text-xs font-semibold text-[var(--color4)] ml-1">Password</label>
-              <div className="relative">
-                <Lock className="absolute left-4 top-3.5 text-[var(--muted)]" size={18} />
-                <input
-                  onChange={e => handleChange(e)}
-                  name='password'
-                  type={showPassword ? 'text' : 'password'}
-                  placeholder="••••••••"
-                  className="w-full premium-input rounded-xl py-3 pl-11 pr-12 text-sm"
-                />
-                <button
-                  type="button"
-                  onClick={() => setShowPassword(!showPassword)}
-                  className="absolute right-4 top-3.5 text-[var(--muted)] hover:text-[var(--color3)] transition-colors"
-                >
-                  {showPassword ? <EyeOff size={18} /> : <Eye size={18} />}
-                </button>
-              </div>
+            <div className="relative group">
+              <Lock className="absolute left-4 top-1/2 -translate-y-1/2 text-[var(--muted)] w-5 h-5 group-focus-within:text-(--color3) transition-colors" />
+              <input
+                type={showPassword ? "text" : "password"}
+                name="password"
+                placeholder="Password"
+                className="w-full bg-[var(--color2)] border border-[var(--border)] rounded-xl py-3.5 pl-12 pr-12 text-sm focus:outline-none focus:border-(--color3) focus:ring-1 focus:ring-(--color3) transition-all placeholder-[var(--muted)] text-[var(--color4)]"
+                value={formData.password}
+                onChange={handleChange}
+                required
+              />
+              <button
+                type="button"
+                className="absolute right-4 top-1/2 -translate-y-1/2 text-[var(--muted)] hover:text-(--color3) transition-colors"
+                onClick={() => setShowPassword(!showPassword)}
+              >
+                {showPassword ? <EyeOff size={18} /> : <Eye size={18} />}
+              </button>
             </div>
 
-            {isLogin && (
-              <div className="flex justify-end">
-                <button type="button" className="text-xs font-medium text-[var(--color3)] hover:opacity-80">Forgot password?</button>
-              </div>
-            )}
-
-            <button className="w-full btn-primary py-3 rounded-xl flex items-center justify-center gap-2 text-sm shadow-lg">
-              {isLogin ? 'Sign In' : 'Create Account'} <ArrowRight size={18} />
+            <button
+              type="submit"
+              disabled={user.isLoading}
+              className="w-full bg-[var(--color3)] text-white font-medium py-3.5 rounded-xl hover:brightness-110 active:scale-[0.98] transition-all shadow-lg shadow-[var(--color3)]/25 flex items-center justify-center gap-2 group disabled:opacity-70 disabled:cursor-not-allowed"
+            >
+              {user.isLoading ? <Loader2 className="animate-spin" size={20} /> : (
+                <>
+                  <span className="relative z-10">{isLogin ? 'Sign In' : 'Create Account'}</span>
+                  <ArrowRight size={18} className="group-hover:translate-x-1 transition-transform" />
+                </>
+              )}
             </button>
           </form>
 
-          {/* Social Auth */}
-          <div className="mt-8">
-            <div className="relative mb-6">
-              <div className="absolute inset-0 flex items-center">
-                <div className="w-full border-t border-[var(--border)]"></div>
-              </div>
-              <div className="relative flex justify-center text-xs">
-                <span className="px-2 bg-[var(--color1)] text-[var(--muted)]">Or continue with</span>
-              </div>
-            </div>
-
-            <div className="grid grid-cols-2 gap-3">
-              <button className="flex items-center justify-center gap-2 bg-[var(--color2)] border border-[var(--border)] py-2.5 rounded-xl hover:bg-[var(--surface-hover)] transition-all text-xs font-medium">
-                <Github size={16} /> GitHub
-              </button>
-              <button className="flex items-center justify-center gap-2 bg-[var(--color2)] border border-[var(--border)] py-2.5 rounded-xl hover:bg-[var(--surface-hover)] transition-all text-xs font-medium">
-                <Chrome size={16} /> Google
-              </button>
-            </div>
+          <div className="mt-8 flex items-center gap-4">
+            <div className="h-px flex-1 bg-[var(--border)]"></div>
+            <span className="text-xs text-[var(--muted)] uppercase tracking-wider">Or continue with</span>
+            <div className="h-px flex-1 bg-[var(--border)]"></div>
           </div>
 
-          <p className="mt-8 text-center text-xs text-[var(--muted)]">
-            {isLogin ? "New to the platform?" : "Already have an account?"}{' '}
+          <div className="flex gap-4 mt-6">
+            <button className="flex-1 flex items-center justify-center gap-2 py-3 rounded-xl border border-[var(--border)] hover:bg-(--surface-hover) transition-all text-sm font-medium text-[var(--color4)] cursor-pointer">
+              <Github size={18} /> Github
+            </button>
+            <button className="flex-1 flex items-center justify-center gap-2 py-3 rounded-xl border border-[var(--border)] hover:bg-(--surface-hover) transition-all text-sm font-medium text-[var(--color4)] cursor-pointer">
+              <Chrome size={18} /> Google
+            </button>
+          </div>
+
+          <p className="mt-8 text-center text-sm text-[var(--muted)]">
+            {isLogin ? "Don't have an account? " : "Already have an account? "}
             <button
               onClick={() => setIsLogin(!isLogin)}
               className="text-[var(--color3)] font-semibold hover:underline"
             >
-              {isLogin ? 'Sign up' : 'Log in'}
+              {isLogin ? 'Sign Up' : 'Sign In'}
             </button>
           </p>
+
+          <div className="mt-auto pt-6 flex items-center justify-center text-xs text-[var(--muted)] gap-2">
+            <ShieldCheck size={14} className="text-[var(--color3)]" />
+            <span>Secure Encrypted Connection</span>
+          </div>
+
         </div>
+
+        {/* Right Section - Decorative/Info (Hidden on Mobile) */}
+        <div className="hidden md:flex w-1/2 bg-[var(--surface-hover)] items-center justify-center p-12 relative overflow-hidden">
+          <div className="absolute inset-0 bg-linear-to-br from-[var(--color3)]/20 to-transparent"></div>
+
+          <div className="relative z-10 max-w-sm">
+            <div className="mb-8 inline-flex p-3 rounded-2xl bg-[var(--glass-bg)] border border-[var(--glass-border)] shadow-lg backdrop-blur-md">
+              <LayoutDashboard size={32} className="text-[var(--color3)]" />
+            </div>
+            <h2 className="text-4xl font-bold mb-6 text-[var(--color4)] leading-tight">
+              Unlock the power of <span className="text-[var(--color3)]">Intelligent AI</span>
+            </h2>
+            <p className="text-[var(--muted)] text-lg leading-relaxed mb-8">
+              Experience a seamless workflow with advanced reasoning, code analysis, and real-time collaboration tools designed for professionals.
+            </p>
+
+            <div className="space-y-4">
+              <div className="flex items-center gap-4 p-4 rounded-xl bg-[var(--glass-bg)] border border-[var(--border)] backdrop-blur-sm">
+                <div className="w-10 h-10 rounded-full bg-[var(--color3)]/10 flex items-center justify-center text-[var(--color3)]">
+                  <ShieldCheck size={20} />
+                </div>
+                <div>
+                  <h4 className="text-sm font-bold text-[var(--color4)]">Enterprise Security</h4>
+                  <p className="text-xs text-[var(--muted)]">Your data is encrypted and safe.</p>
+                </div>
+              </div>
+              {/* Add more feature blocks if needed */}
+            </div>
+          </div>
+        </div>
+
       </div>
     </div>
   );
 };
+
 export default Auth;
