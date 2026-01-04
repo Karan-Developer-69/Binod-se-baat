@@ -1,79 +1,159 @@
 @import "tailwindcss";
 
-:root{
-    --color1:#061E29;
-    --color2:#1D546D;
-    --color3:#5F9598;
-    --color4:#F3F4F4;
-  --font-bold: 'Anton', sans-serif;
-  --font-light: 'Schibsted Grotesk', sans-serif;
+:root {
+  /* --- Universal Color Palette --- */
+  /* Dark Mode (Default) */
+  --color1: #0F172A; /* Deep Slate Background */
+  --color2: #1E293B; /* Secondary Panel/Surface */
+  --color3: #38BDF8; /* Primary Brands (Sky Blue) - Professional & Trustworthy */
+  --color4: #F8FAFC; /* Text/Foreground */
+
+  --muted: #94A3B8; /* Muted Text */
+  --border: #334155; /* Borders */
+
+  /* --- Glassmorphism System --- */
+  --glass-bg: rgba(30, 41, 59, 0.7);
+  --glass-border: rgba(255, 255, 255, 0.1);
+  --glass-shadow: 0 8px 32px 0 rgba(0, 0, 0, 0.3);
+  --glass-highlight: rgba(255, 255, 255, 0.05);
+  --glass-blur: 16px;
+
+  /* --- Interactive States --- */
+  --surface-hover: rgba(255, 255, 255, 0.05);
+  --input-bg: rgba(15, 23, 42, 0.6);
+
+  /* --- Typography --- */
+  --font-heading: 'Inter', sans-serif; /* Clean, Professional */
+  --font-body: 'Inter', sans-serif;
+  --font-mono: 'JetBrains Mono', monospace;
 }
 
-@import url('https://fonts.googleapis.com/css2?family=Anton&display=swap');
-.anton-regular {
-  font-family: "Anton", sans-serif;
-  font-weight: 400;
-  font-style: normal;
+[data-theme='light'] {
+  /* Light Mode */
+  --color1: #FFFFFF; /* Pure White */
+  --color2: #F1F5F9; /* Light Gray Surface */
+  --color3: #0284C7; /* Primary Brand (Deep Sky) */
+  --color4: #0F172A; /* Dark Text */
+
+  --muted: #64748B;
+  --border: #E2E8F0;
+
+  --glass-bg: rgba(255, 255, 255, 0.8);
+  --glass-border: rgba(0, 0, 0, 0.05);
+  --glass-shadow: 0 4px 20px rgba(0, 0, 0, 0.05);
+  --glass-highlight: rgba(255, 255, 255, 0.5);
+
+  --surface-hover: rgba(0, 0, 0, 0.03);
+  --input-bg: #FFFFFF;
 }
 
-@import url('https://fonts.googleapis.com/css2?family=Anton&family=Schibsted+Grotesk:ital,wght@0,400..900;1,400..900&display=swap');
-.anton-regular {
-  font-family: "Anton", sans-serif;
-  font-weight: 400;
-  font-style: normal;
-}
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap');
+
+/* --- Reset & Base --- */
 html {
   scroll-behavior: smooth;
+  -webkit-font-smoothing: antialiased;
 }
 
-.font-anton { font-family: 'Anton', sans-serif; }
-.font-grotesk { font-family: 'Schibsted Grotesk', sans-serif; }
-
-/* Reveal Animation */
-.reveal {
-  opacity: 0;
-  transform: translateY(30px);
-  transition: all 0.8s cubic-bezier(0.22, 1, 0.36, 1);
+body {
+  background-color: var(--color1);
+  color: var(--color4);
+  font-family: var(--font-body);
+  transition: background-color 0.4s ease, color 0.4s ease;
 }
 
-.reveal.active {
-  opacity: 1;
+/* --- Typography Classes --- */
+.font-heading {
+  font-family: var(--font-heading);
+}
+
+.font-body {
+  font-family: var(--font-body);
+}
+
+.font-mono {
+  font-family: var(--font-mono);
+}
+
+/* --- Animations --- */
+.fade-in {
+  animation: fadeIn 0.6s ease-out forwards;
+}
+
+@keyframes fadeIn {
+  from {
+    opacity: 0;
+    transform: translateY(10px);
+  }
+
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+/* --- Premium Utilities --- */
+
+/* Standard Glass Card */
+.glass-card {
+  background: var(--glass-bg);
+  backdrop-filter: blur(var(--glass-blur));
+  -webkit-backdrop-filter: blur(var(--glass-blur));
+  border: 1px solid var(--glass-border);
+  box-shadow: var(--glass-shadow);
+  transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+/* High-End Input Field */
+.premium-input {
+  background: var(--input-bg);
+  border: 1px solid var(--border);
+  color: var(--color4);
+  transition: all 0.2s ease;
+}
+
+.premium-input:focus {
+  border-color: var(--color3);
+  box-shadow: 0 0 0 4px rgba(56, 189, 248, 0.1); /* Subtle ring using color3 */
+  outline: none;
+}
+
+.premium-input::placeholder {
+  color: var(--muted);
+}
+
+/* Primary Button */
+.btn-primary {
+  background: var(--color3);
+  color: white;
+  transition: all 0.2s ease;
+  font-weight: 500;
+}
+
+.btn-primary:hover {
+  filter: brightness(1.1);
+  transform: translateY(-1px);
+  box-shadow: 0 4px 12px rgba(56, 189, 248, 0.25);
+}
+
+.btn-primary:active {
   transform: translateY(0);
 }
 
-.theme-transition {
-  transition: background-color 0.6s ease, color 0.6s ease;
-}
-
-/* Glassmorphism */
-.premium-glass {
-  background: rgba(29, 84, 109, 0.1);
-  backdrop-filter: blur(12px);
-  border: 1px solid rgba(95, 149, 152, 0.1);
-}
-
-/* Glassmorphism Utility */
-.lysis-glass {
-  background: rgba(29, 84, 109, 0.2);
-  backdrop-filter: blur(20px) saturate(180%);
-  -webkit-backdrop-filter: blur(20px) saturate(180%);
-  border: 1px solid rgba(255, 255, 255, 0.1);
-}
-
-.lysis-glass-light {
-  background: rgba(255, 255, 255, 0.05);
-  backdrop-filter: blur(10px);
-  border: 1px solid rgba(255, 255, 255, 0.05);
-}
-
-/* Custom Scrollbar */
+/* Subtle Scrollbar */
 ::-webkit-scrollbar {
-  width: 4px;
+  width: 6px;
 }
+
 ::-webkit-scrollbar-track {
   background: transparent;
 }
+
 ::-webkit-scrollbar-thumb {
-  background: var(--color3);
+  background: var(--border);
   border-radius: 10px;
+}
+
+::-webkit-scrollbar-thumb:hover {
+  background: var(--muted);
 }

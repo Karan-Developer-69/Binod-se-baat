@@ -1,10 +1,26 @@
 import React, { useState, useEffect } from 'react';
 import { Menu, X, ArrowRight, Sparkles, Cpu, ShieldCheck, Globe2, Command, Sun, Moon } from 'lucide-react';
+import { Link } from 'react-router-dom';
+import { useDispatch, useSelector } from 'react-redux';
+import { setUser } from '../redux/features/userSlice';
 
 const Home: React.FC = () => {
+
+  const [isloggedIn,theme] = useSelector(state => [state?.user.isLoggedIn,state?.user.theme]);
+  const dispatch = useDispatch();
   const [isDark, setIsDark] = useState(false);
   const [isMenuOpen, setIsMenuOpen] = useState(false);
   const [scrolled, setScrolled] = useState(false);
+
+  useEffect(()=>{
+    const result = ()=>{
+      if(theme==='dark'){
+      return true
+      }
+      return false
+    }
+    setIsDark(result)
+  },[theme])
 
   // 1. Scroll-Reveal Logic
   useEffect(() => {
@@ -57,12 +73,15 @@ const Home: React.FC = () => {
                 {link}
               </a>
             ))}
-            <button onClick={() => setIsDark(!isDark)} className="p-2 rounded-full hover:bg-black/10 transition-colors">
+            <button onClick={() => dispatch(setUser({theme:!isMenuOpen}))} className="p-2 rounded-full hover:bg-black/10 transition-colors">
               {isDark ? <Sun size={20} className="text-[#5F9598]" /> : <Moon size={20} className="text-[#1D546D]" />}
-            </button>
-            <button className="bg-[#5F9598] text-[#061E29] px-8 py-2.5 rounded-full font-anton text-sm tracking-widest hover:scale-110 active:scale-95 transition-all">
+            </button>{!isloggedIn ?
+            <Link to={'/auth'} className="bg-[#5F9598] text-[#061E29] px-8 py-2.5 rounded-full font-anton text-sm tracking-widest hover:scale-110 active:scale-95 transition-all">
               LOGIN
-            </button>
+            </Link> :
+            <Link to={'/chat'} className="bg-[#5F9598] text-[#061E29] px-8 py-2.5 rounded-full font-anton text-sm tracking-widest hover:scale-110 active:scale-95 transition-all">
+              CHAT
+            </Link>}
           </div>
 
           {/* Mobile Menu Toggle (Z-Index Fixed) */}
