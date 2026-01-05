@@ -42,7 +42,7 @@ export const getResponse = (prompt: string, apiUrl: string = API_URL, sessionId:
         let lastLength = 0;
 
         // Backend expects: class ChatRequest(BaseModel): query: str, thread_id: str
-        await axios.post(`${apiUrl}/chat`, {
+        await axios.post(`${apiUrl}/generate`, {
             query: prompt,        // "prompt" changed to "query" to match Python backend
             thread_id: sessionId  // Required by Python LangGraph for memory
         }, {
