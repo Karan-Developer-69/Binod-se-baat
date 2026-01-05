@@ -174,30 +174,53 @@ const Chat: React.FC = () => {
     }
   };
 
-  const handleSend = () => {
-    if (loading) {
-      stopGeneration();
-      return;
-    }
+  // Chat.jsx / Chat.tsx ke andar handleSend ko replace karo:
 
-    if (!input.trim()) return;
-
-    // Abort previous if any (safeguard)
+const handleSend = () => {
+  if (loading) {
     stopGeneration();
+    return;
+  }
 
-    const controller = new AbortController();
-    abortControllerRef.current = controller;
+  if (!input.trim()) return;
 
-    let finalPrompt = input;
-    if (modes.web) finalPrompt += " (Use Web Search)";
-    if (modes.deep) finalPrompt += " (Think Deeply)";
+  // Pichla stream agar chal raha ho to band kar
+  stopGeneration();
 
-    dispatch(addChat({ id: Date.now(), role: 'user', content: input }));
-    dispatch(getResponse(finalPrompt, MODEL_URLS[selectedModel], "session-1", controller.signal) as unknown as any);
+  const controller = new AbortController();
+  abortControllerRef.current = controller;
 
-    setInput('');
-    if (textareaRef.current) textareaRef.current.style.height = 'auto';
-  };
+  let finalPrompt = input;
+  // Yaha tum extra text add nahi bhi karo to chalega; Go backend pe already flags jaa rahe
+  // Agar UX ke liye rakhna hai to rehne do:
+  // if (modes.web) finalPrompt += " (Use Web Search)";
+  // if (modes.deep) finalPrompt += " (Think Deeply)";
+
+  // User ka message chat me add
+  dispatch(
+    addChat({
+      id: Date.now(),
+      role: "user",
+      content: input,
+    })
+  );
+
+  // Yaha se DIRECT tumhara Go backend hit hoga
+  dispatch(
+    getResponse(
+      finalPrompt,
+      MODEL_URLS[selectedModel], // qwen/gptoss HF Space URL, jisme tumhara Go container expose hai
+      "session-1",
+      modes.web,
+      modes.deep,
+      controller.signal
+    ) as any
+  );
+
+  setInput("");
+  if (textareaRef.current) textareaRef.current.style.height = "auto";
+};
+
 
   const handleKeyDown = (e: React.KeyboardEvent) => {
     if (e.key === 'Enter' && !e.shiftKey) {
