@@ -1,8 +1,9 @@
+// Updated apiSlice.ts - Now works with your Go Fiber AI Agent (port 7860)
 import { createSlice, type Dispatch } from "@reduxjs/toolkit";
 import { addChat, updateLastChat } from "./chatSlice";
 
-// Make sure your VITE_API_URL is "http://localhost:8000" in .env file
-const API_URL = import.meta.env.VITE_API_URL || "http://localhost:8000";
+// Updated for your Go Fiber API (change port if deployed)
+const API_URL = import.meta.env.VITE_API_URL || "http://localhost:7860";
 
 interface ApiState {
     loading: boolean;
@@ -26,49 +27,59 @@ export const { setLoading, setError } = apiSlice.actions;
 
 import axios from "axios";
 
-// Optional: You can pass a sessionId if you want to maintain chat history per user
-export const getResponse = (prompt: string, apiUrl: string = API_URL, sessionId: string = "session-1", signal?: AbortSignal) => async (dispatch: Dispatch) => {
+// Updated: Matches your Go backend exactly (query, web_search, deep_think)
+export const getResponse = (
+    prompt: string, 
+    apiUrl: string = API_URL, 
+    sessionId: string = "session-1", 
+    webSearch: boolean = false,
+    deepThink: boolean = false,
+    signal?: AbortSignal
+) => async (dispatch: Dispatch) => {
     dispatch(setLoading(true));
     dispatch(setError(null));
 
-    // Add initial empty assistant message to UI
+    // Add initial empty assistant message
     dispatch(addChat({
         id: Date.now(),
         role: 'assistant',
-        content: ''
+        content: webSearch ? "🔍 Searching Web...\n" : (deepThink ? "🧠 DeepThink Analyzing...\n" : '')
     }));
 
     try {
         let lastLength = 0;
 
-        // Backend expects: class ChatRequest(BaseModel): query: str, thread_id: str
+        // Exact payload your Go backend expects
         await axios.post(`${apiUrl}/generate`, {
-            query: prompt,        // "prompt" changed to "query" to match Python backend
-            thread_id: sessionId  // Required by Python LangGraph for memory
+            query: prompt,
+            web_search: webSearch,    // Changed from thread_id
+            deep_think: deepThink     // New options for web/deep
         }, {
             headers: {
                 "Content-Type": "application/json",
             },
-            signal, // Pass the abort signal
-            responseType: 'text', // Important for streaming text
+            signal,
+            responseType: 'stream',  // Better for true streaming
             onDownloadProgress: (progressEvent) => {
-                const response = progressEvent.event.target.response;
-                const chunk = response.substring(lastLength);
-                lastLength = response.length;
+                if (progressEvent.progress) {
+                    const response = progressEvent.currentTarget.response;
+                    const chunk = response.substring(lastLength);
+                    lastLength = response.length;
 
-                if (chunk) {
-                    dispatch(updateLastChat(chunk));
+                    if (chunk) {
+                        dispatch(updateLastChat(chunk));
+                    }
                 }
             }
         });
 
     } catch (err: any) {
         if (axios.isCancel(err)) {
-            console.log("Request canceled by user");
+            console.log("Request canceled");
         } else {
             console.error("API Error:", err);
-            dispatch(setError(err.message || "Failed to fetch response"));
-            dispatch(updateLastChat("\n\n❌ **Connection Error:** Backend is not running or failed to respond."));
+            dispatch(setError(err.response?.data || err.message || "AI Agent not running"));
+            dispatch(updateLastChat("\n\n❌ **Error:** Make sure Docker is running on port 7860"));
         }
     } finally {
         dispatch(setLoading(false));
